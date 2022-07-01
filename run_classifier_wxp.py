@@ -208,7 +208,38 @@ class TestProcessor(DataProcessor):
     """
     test
     """
+    def get_train_examples(self, data_dir):
+        """Gets a collection of `InputExample`s for the train set."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
 
+    def get_dev_examples(self, data_dir):
+        """Gets a collection of `InputExample`s for the dev set."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.tsv")), "dev")
+
+    def get_test_examples(self, data_dir):
+        """Gets a collection of `InputExample`s for prediction."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "test.tsv")), "test")
+
+    def get_labels(self):
+        """Gets the list of labels for this data set."""
+        return ['0', '1', '2', '3']
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        examples = []
+        # lines是_read_tsv()方法读入的数据, 每一行样本按照"\t"切成一个list
+        for i, line in enumerate(lines):
+            # guid是样本的id, 保证唯一性就可以了
+            guid = "%s-%s" % (set_type, i)
+            # 输入的文本数据 (不需要分词)
+            text_a = tokenization.convert_to_unicode(line[1])
+            label = tokenization.convert_to_unicode(line[0])
+            examples.append(
+                InputExample(guid=guid, text_a=text_a, label=label))
+        return examples
 
 
 class XnliProcessor(DataProcessor):
@@ -466,7 +497,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
     label_id = label_map[example.label]
     if ex_index < 5:
         tf.logging.info("*** Example ***")
-        tf.logging.info("guid: %s" % (example.guid))
+        tf.logging.info("guid: %s" % example.guid)
         tf.logging.info("tokens: %s" % " ".join(
             [tokenization.printable_text(x) for x in tokens]))
         tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
@@ -620,7 +651,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
         per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
         loss = tf.reduce_mean(per_example_loss)
 
-        return (loss, per_example_loss, logits, probabilities)
+        return loss, per_example_loss, logits, probabilities
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
@@ -795,6 +826,7 @@ def main(_):
         "mnli": MnliProcessor,
         "mrpc": MrpcProcessor,
         "xnli": XnliProcessor,
+        "test": TestProcessor,
     }
 
     tokenization.validate_case_matches_checkpoint(FLAGS.do_lower_case,
